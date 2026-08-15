@@ -43,7 +43,7 @@ export async function testConflictFailsFast() {
   eq(result.reason, 'conflict', 'conflict reason')
   ok(result.holder.pid === process.pid, 'holder reported')
   ok(!second.isWriter, 'second is not writer')
-  throws(() => second.assertCanWrite(), /refusing/, 'second refuses to write')
+  throws(() => second.assertCanWrite(), /写者锁被 pid/, 'second refuses to write (中文报错)')
   first.release()
   rmSync(dir, { recursive: true, force: true })
 }
@@ -77,7 +77,7 @@ export async function testReadonlyNeverWrites() {
   eq(result.ok, false, 'readonly does not acquire')
   eq(result.reason, 'readonly', 'reason readonly')
   ok(!existsSync(join(dir, '.dsh-collab-writer.lock')), 'no lock file written')
-  throws(() => lock.assertCanWrite(), /read-only follower/, 'readonly refuses write')
+  throws(() => lock.assertCanWrite(), /只读跟随者拒绝写入/, 'readonly refuses write (中文报错)')
   rmSync(dir, { recursive: true, force: true })
 }
 
@@ -90,7 +90,7 @@ export async function testStolenTokenGuard() {
     join(dir, '.dsh-collab-writer.lock'),
     JSON.stringify({ token: 'other', pid: 1, hostname: 'other', startedAt: Date.now(), heartbeatAt: Date.now(), version: 1 }),
   )
-  throws(() => lock.assertCanWrite(), /replaced or stolen/, 'write refused after lock stolen')
+  throws(() => lock.assertCanWrite(), /已被替换或丢失/, 'write refused after lock stolen (中文报错)')
   // 释放时不应误删他人的锁
   lock.release()
   ok(existsSync(join(dir, '.dsh-collab-writer.lock')), 'other lock untouched')
@@ -110,7 +110,7 @@ export async function testDegradeToReadonlyOnConflict() {
   eq(second.status().degraded, true, 'degraded flag set')
   ok(!second.isWriter, 'not writer after degrade')
   // 写者仍存活：降级实例尝试晋升 → 抛出英文冲突错误（不写、不损坏）
-  throws(() => second.assertCanWrite(), /writer lock is held by pid/, 'live conflict throws English error')
+  throws(() => second.assertCanWrite(), /写者锁被 pid/, 'live conflict throws 中文 error')
   first.release()
   rmSync(dir, { recursive: true, force: true })
 }
@@ -149,7 +149,7 @@ export async function testLiveConflictStillThrowsEnglish() {
   const second = makeLock(dir)
   ok(!second.acquire().ok, 'second conflict')
   second.degrade()
-  throws(() => second.assertCanWrite(), /writer lock is held by pid/, 'live conflict throws English error')
+  throws(() => second.assertCanWrite(), /写者锁被 pid/, 'live conflict throws 中文 error')
   first.release()
   rmSync(dir, { recursive: true, force: true })
 }

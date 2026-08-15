@@ -85,7 +85,8 @@ dev_inject_plugin dir=/path/to/dsh-collab-sync
   全部接口）。
 - **配置页**：`http://<host>:<port>/collab/settings`（协作面板右上角入口）——
   选择「全部接口 0.0.0.0 / 仅本机 127.0.0.1 / 指定 IP」，填写额外信任主机，
-  保存后写入 profile 补丁并热重载重绑（原补丁自动备份 `.collab-bak-<ts>`）。
+  保存到 `~/.dsh/.env`（`DSH_WEB_BIND` / `DSH_WEB_EXTRA_TRUSTED`），
+  **重启 dsh web 后生效**（不会触发热重载，避免路由丢失/断连）。
   这是开放多 IP 的**显式控制面**：选 0.0.0.0 后 tailnet / LAN / 本机 IP 全部
   可达同一个后端。
 - **指定 IP 绑定**：原生 host schema 只允许 127.0.0.1/0.0.0.0，需要先运行一次
@@ -121,7 +122,8 @@ dev_inject_plugin dir=/path/to/dsh-collab-sync
 
 | 现象 | 处理 |
 |---|---|
-| 第二个后端启动显示「degrading to READ-ONLY follower」 | 正常：自动降级为只读跟随者，不写日志；写者身份见 `/collab/api/status`。需要实时同步请改用单后端 0.0.0.0 |
+| 第二个后端启动显示「降级为只读跟随者」 | 正常：自动降级，不写日志；写者身份见 `/collab/api/status`。被占用时发消息会得到中文提示（含写者 pid/端口）——请连写者实例，或只运行一个后端（0.0.0.0） |
+| 锁异常卡住解不开 | 设置页 `/collab/settings` 底部「强制重置写者锁」逃生舱（确认其他后端已停止后使用），无需再关插件 |
 | 第二个后端（`mode: writer`）启动报「another dsh instance already owns session root」 | 严格单后端模式：停掉运行中的实例，或换 `DSH_HOME`，或改回 `mode: auto`/`readonly` |
 | 日志 `corrupt session log: seq gap in committed region` | 运行 `collab_repair` 或重启后端（启动扫描自动修复）；原件在 `.corrupt.bak` |
 | 徽标不显示 | 检查 `presence: true` 与浏览器控制台（CSP 拦截时静默降级，面板仍可用） |
