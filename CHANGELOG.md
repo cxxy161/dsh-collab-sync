@@ -66,3 +66,13 @@
 ### Changed
 - 设置页「开放 IP / 协作」卡片 UI 改用 **dsh 本体设计令牌（--dsw-alias-*）**，
   与设置页卡片/字段风格一致（对齐 PluginCard / fields 样式）。
+
+## [0.1.6] - 2026-08-15
+
+### Fixed
+- **守卫永不阻断回合**：`assertCanWrite`（抛错式）→ `canWrite`（返回
+  `{ok,reason,message}`）。写路径无法持锁时改为**响亮告警 + 跳过本次落盘**
+  （内存回合继续，文件保持一致、不损坏、不抛错）。多实例残留时用户不再遇到
+  「本轮运行失败」。
+- 客户端设置卡片改为 **React 类组件**（内联 react UMD，`scripts/build-client.mjs`
+  构建 `lib/client.js`），修复 settings.section 空白（slot 组件必须是 React 组件）。
