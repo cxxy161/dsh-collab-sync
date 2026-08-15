@@ -52,3 +52,11 @@
   `dsh-client-ui-settings`（插件配置）、`dsh-client-ui-settings-general`
   （打开配置文件）、`dsh-client-ui-settings-models`（模型欢迎条）。
   服务端侧由 `patch-dsh.sh` 的 `trustedHosts` 放行已配套（须两者同时生效）。
+
+## [0.1.4] - 2026-08-15
+
+### Changed
+- **IP 设置移入 dsh 设置页**：新增客户端模块（`lib/client.js`，`dsh.client` 清单），
+  在设置页注册「开放 IP / 协作」分区（绑定范围 / 额外信任主机 / 强制重置写者锁）。
+- **移除右下角 beacon 徽标**（不再注入 index.html、不再占用屏幕）。
+- **移除独立 `/collab/settings` 页面**（入口并入 dsh 设置页）。

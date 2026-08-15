@@ -16,8 +16,8 @@
 - **自修复**：启动时自动扫描全部会话日志，对已损坏文件执行「选最长连续分支 →
   重建合法两帧 Zstd → 原子替换 + 原件备份 `.corrupt.bak`」，复刻手工修复流程。
 - **写路径兜底**：每次落盘前校验锁身份；锁丢失或只读模式下拒绝写入。
-- **多终端感知**：每个 GUI 页面右下角显示在线终端徽标（👥 N）；`/collab/panel`
-  协作面板展示在线终端、写者身份、修复历史与最近活动。
+- **多终端感知**：设置页「开放 IP / 协作」分区 + `/collab/panel` 协作面板
+  （在线终端、写者身份、修复历史、最近活动）。
 - **多 IP 多端访问**：原生 dsh 不允许 `--host 0.0.0.0`，本插件把 webserver 默认
   bind 改为 `0.0.0.0`（全部接口），tailnet / LAN / 本机所有 IP 同时可达同一个
   后端；`/collab/settings` 配置页可切换监听范围并补充信任主机（热重载重绑）。
@@ -83,10 +83,10 @@ dev_inject_plugin dir=/path/to/dsh-collab-sync
 - **默认**：webserver `host` 优先级为
   `命令行 --host > 环境变量 DSH_WEB_BIND > 127.0.0.1`（安全回退，不擅自开放
   全部接口）。
-- **配置页**：`http://<host>:<port>/collab/settings`（协作面板右上角入口）——
+- **设置入口**：dsh 设置页 → **「开放 IP / 协作」** 分区（客户端插件注册）——
   选择「全部接口 0.0.0.0 / 仅本机 127.0.0.1 / 指定 IP」，填写额外信任主机，
   保存到 `~/.dsh/.env`（`DSH_WEB_BIND` / `DSH_WEB_EXTRA_TRUSTED`），
-  **重启 dsh web 后生效**（不会触发热重载，避免路由丢失/断连）。
+  **重启 dsh web 后生效**（不触发热重载，避免路由丢失/断连）。
   这是开放多 IP 的**显式控制面**：选 0.0.0.0 后 tailnet / LAN / 本机 IP 全部
   可达同一个后端。
 - **指定 IP 绑定**：原生 host schema 只允许 127.0.0.1/0.0.0.0，需要先运行一次
@@ -101,10 +101,8 @@ dev_inject_plugin dir=/path/to/dsh-collab-sync
 
 ## 使用
 
-- 打开主 GUI：右下角出现 `👥 N` 徽标（N = 在线终端数），点击打开协作面板。
-- 协作面板：`http://<host>:<port>/collab/panel` —— 在线终端、写者身份、修复历史、
-  最近活动；右上角进入「开放 IP 配置」。
-- 开放 IP 配置：`http://<host>:<port>/collab/settings`。
+- 开放 IP / 协作：设置页 → 「开放 IP / 协作」分区（绑定范围、信任主机、强制重置写者锁）。
+- 协作面板：`http://<host>:<port>/collab/panel` —— 在线终端、写者身份、修复历史、最近活动。
 - 状态 JSON：`GET /collab/api/status`；绑定信息：`GET /collab/api/bind`。
 - Agent 工具：
   - `collab_status` —— 查看写者/在线终端/修复统计
@@ -126,7 +124,7 @@ dev_inject_plugin dir=/path/to/dsh-collab-sync
 | 锁异常卡住解不开 | 设置页 `/collab/settings` 底部「强制重置写者锁」逃生舱（确认其他后端已停止后使用），无需再关插件 |
 | 第二个后端（`mode: writer`）启动报「another dsh instance already owns session root」 | 严格单后端模式：停掉运行中的实例，或换 `DSH_HOME`，或改回 `mode: auto`/`readonly` |
 | 日志 `corrupt session log: seq gap in committed region` | 运行 `collab_repair` 或重启后端（启动扫描自动修复）；原件在 `.corrupt.bak` |
-| 徽标不显示 | 检查 `presence: true` 与浏览器控制台（CSP 拦截时静默降级，面板仍可用） |
+| 设置页无「开放 IP / 协作」分区 | 需重启 dsh（客户端清单在启动时扫描装配） |
 | 跨机器共享 `~/.dsh`（NFS） | 调大 `lockStaleAfterMs`，心跳仍按各自机器时钟 |
 
 ## 开发
