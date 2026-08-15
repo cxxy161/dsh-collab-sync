@@ -4,6 +4,18 @@
 
 > Single-backend, multi-terminal collaboration for the DeepSeek Harness Web GUI.
 
+## 核心亮点（重中之重）
+
+1. **远程设备也能用设置页** —— 修复 dsh 原生 bug：非 `127.0.0.1` 来源（LAN /
+   tailnet / 手机）打开「设置 → 插件」等页面**一片空白**。根因是客户端把远程
+   来源的设置作用域判为 `memory/unavailable`；本插件把三处回环门禁改为
+   `host`，远程设备可正常读写设置（`scripts/setup-bind.sh` 幂等应用，服务端
+   `trustedHosts` 放行配套）。
+2. **设置页内直接调整开放范围** —— 「设置 → 开放 IP / 协作」卡片：选
+   「全部接口 0.0.0.0 / 仅本机 / 指定 IP」+ 额外信任主机，保存到
+   `~/.dsh/.env`，重启生效。这是多设备共同工作的**总开关**：一个后端、所有
+   IP 可达、浏览器经 mux 实时同步。
+
 ## 为什么开发这个插件
 
 做多终端协作（电脑 + 手机 + 多台设备同时操作同一个 dsh）时，踩到过一个真实的坑：
