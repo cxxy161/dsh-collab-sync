@@ -14,9 +14,9 @@
 │ ② 修复器 repair.js    启动扫描 + 两帧 Zstd 重建 + 备份        │
 │ ③ 写路径守卫 guard.js  落盘前校验锁身份，读取前确保已修复      │
 ├─────────────────────────────────────────────────────────────┤
-│ ④ 多终端感知 设置页「开放 IP / 协作」分区 + /collab/panel      │
-│    - 客户端模块注册设置分区（绑定/信任/强制重置锁）             │
-│    - /collab/api/status + SSE presence + 协作面板             │
+│ ④ 多终端感知 设置页「开放 IP / 协作」分区                      │
+│    - 客户端模块注册设置分区（绑定/信任/写者诊断/修复/强制重置锁） │
+│    - /collab/api/status + SSE presence（供工具/外部监控）       │
 │    - collab_status / collab_repair agent 工具                 │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -91,7 +91,6 @@ A=36245..38473 与 B=36245..148012）。修复：
 |---|---|
 | `GET /collab/api/status` | JSON：写者/在线终端/修复统计 |
 | `GET /collab/presence` | SSE：snapshot + peer/joined|changed|left + activity |
-| `GET /collab/panel` | 协作面板 HTML |
 | `GET/POST /collab/api/bind` | 绑定/信任配置（设置页客户端卡片使用） |
 | `POST /collab/api/lock` | 强制重置写者锁（逃生舱） |
 | `POST /collab/api/repair` | 触发一次全量修复扫描 |

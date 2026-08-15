@@ -1,6 +1,6 @@
 {
   "name": "dsh-collab-sync",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "单后端多终端无缝同步协作插件：单写者锁（防会话日志并发写损坏）+ 会话日志自修复 + 多端在线感知（presence beacon / 协作面板 / agent 工具）。Single-backend multi-terminal collaboration for DeepSeek Harness.",
   "private": true,
   "type": "module",

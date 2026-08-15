@@ -54,6 +54,8 @@ class CollabBindCard extends React.Component {
       custom: '',
       status: '',
       err: false,
+      writer: null,
+      repairs: null,
     }
     this.customRef = React.createRef()
     this.trustedRef = React.createRef()
@@ -83,6 +85,13 @@ class CollabBindCard extends React.Component {
           selHost: cur === '0.0.0.0' || cur === '127.0.0.1' ? cur : '__custom__',
           custom: cur === '0.0.0.0' || cur === '127.0.0.1' ? '' : cur,
         })
+      })
+      .catch(() => {})
+    fetch('/collab/api/status')
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d.ok) return
+        this.setState({ writer: d.writer, repairs: d.repairs?.stats || null })
       })
       .catch(() => {})
   }
@@ -207,6 +216,26 @@ class CollabBindCard extends React.Component {
             React.createElement('b', null, s.port ?? '-'),
             ' · 自动信任 LAN ',
             React.createElement('b', null, s.lan.join('、') || '（无）'),
+          ),
+        ),
+        field(
+          '诊断信息',
+          '写者身份与会话日志修复统计（来自 /collab/api/status）',
+          React.createElement(
+            'div',
+            { className: 'dcs-meta' },
+            '写者 ',
+            React.createElement(
+              'b',
+              null,
+              s.writer ? 'pid ' + (s.writer.holder?.pid ?? '?') + (s.writer.holder?.port ? ' · 端口 ' + s.writer.holder.port : '') + (s.writer.degraded ? '（本实例已降级为只读跟随者）' : '') : '读取中…',
+            ),
+            ' · 修复 ',
+            React.createElement(
+              'b',
+              null,
+              s.repairs ? '扫描 ' + s.repairs.scanned + ' · 健康 ' + s.repairs.clean + ' · 已修 ' + s.repairs.repaired + ' · 失败 ' + s.repairs.unrecoverable : '读取中…',
+            ),
           ),
         ),
       ),

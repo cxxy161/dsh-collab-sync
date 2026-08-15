@@ -76,3 +76,15 @@
   「本轮运行失败」。
 - 客户端设置卡片改为 **React 类组件**（内联 react UMD，`scripts/build-client.mjs`
   构建 `lib/client.js`），修复 settings.section 空白（slot 组件必须是 React 组件）。
+
+## [0.1.7] - 2026-08-15
+
+### Changed
+- **移除 `/collab/panel` 协作面板**（按讨论方案 A）：写者诊断与修复统计并入
+  设置页「开放 IP / 协作」卡片；`/collab/presence` 保留供工具/外部监控使用。
+- **super-injector 设置页空白修复**：`dsh-client-runtime` 的 `slots.register`
+  增加兼容垫片（`component ?? options.component`），兼容旧约定（component 放
+  options 内）；固化进 `patch-dsh.sh`（幂等）。
+
+### Fixed
+- 设置卡片新增「诊断信息」字段（写者 pid/端口 + 会话日志修复统计）。
