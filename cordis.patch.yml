@@ -1,0 +1,20 @@
+# dsh-collab-sync bundle 层。
+# 1) webserver 行覆盖：必须同时带出 host 与 port（patch 语义 = 整体替换 config）。
+#    优先级：命令行 --host > 环境变量 DSH_WEB_BIND > 默认 127.0.0.1（安全回退）。
+#    开放多 IP 访问：/collab/settings 配置页写入 0.0.0.0 / 指定 IP（用户层在后，优先）。
+# 2) 插入插件行。
+- id: webserver
+  config:
+    host: !!js (ctx.webStartup?.host ?? process.env.DSH_WEB_BIND ?? '127.0.0.1')
+    port: !!js (ctx.webStartup?.port ?? 3080)
+
+- insert:
+    - id: dsh-collab-sync
+      name: dsh-collab-sync
+      config:
+        mode: auto
+        lockStaleAfterMs: 15000
+        heartbeatMs: 5000
+        repairOnBoot: true
+        repairBackupSuffix: '.corrupt.bak'
+        presence: true
