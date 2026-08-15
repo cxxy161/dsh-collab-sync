@@ -4,33 +4,58 @@
 
 > Single-backend, multi-terminal collaboration for the DeepSeek Harness Web GUI.
 
+## 为什么开发这个插件
+
+做多终端协作（电脑 + 手机 + 多台设备同时操作同一个 dsh）时，踩到过一个真实的坑：
+
+- 为了让 tailnet / 局域网都能访问，曾同时跑**两个 dsh web 实例**（各自绑定一个 IP），
+  它们**并发追加写同一份 `~/.dsh/sessions/**/session.jsonl.zstd`**；
+- dsh 会话日志是"追加式 + 事件 seq 严格连续"的 Zstd/JSONL 文件，seq 由各进程
+  **内存中的日志长度**独立分配；
+- 两个进程同时追加 → seq 分叉/重复 → 官方读取端报
+  **`corrupt session log: seq gap in committed region`** → 整个会话历史无法加载，
+  只能手工拆帧、删冲突分支、按"两帧 Zstd"规范重拼文件救回。
+
+复盘后的结论：**"同步"才是正解，锁只是保险丝。**
+
+- dsh 原生的实时同步机制（mux 广播）要求**所有终端连同一个后端进程**——单进程
+  天然持锁、永不冲突、永不当人；
+- 插件把"多 IP 指向同一个后端"（`0.0.0.0` 绑定 + 信任主机配置）做成显式控制面；
+- 单写者锁只负责挡住"第二个进程"这个病根，并且**写路径守卫永不阻断你的回合**
+  （锁异常时响亮告警、跳过落盘，而不是让对话失败）；
+- 对已经损坏的历史日志，启动时**自动扫描修复**（选最长连续分支重建 + 备份），
+  你不再需要手工拆文件。
+
 ## 解决什么问题
 
 多个终端（电脑/手机浏览器）同时开着同一个 dsh WebUI 协作时：
 
-- **防损坏**：多个 dsh 进程并发追加写同一个 `~/.dsh/sessions/**/session.jsonl.zstd`
-  会导致事件 seq 分叉/重复，官方读取端报 `seq gap in committed region`，整个会话
-  历史无法加载。本插件用**单写者锁**从根上禁止并发写：第一个后端成为写者，其余
-  后端**自动降级为只读跟随者**（不崩、不抢锁、不写）；`mode: writer` 下第二实例
-  则快速失败并给出清晰提示。
-- **自修复**：启动时自动扫描全部会话日志，对已损坏文件执行「选最长连续分支 →
-  重建合法两帧 Zstd → 原子替换 + 原件备份 `.corrupt.bak`」，复刻手工修复流程。
-- **写路径兜底**：每次落盘前校验锁身份；锁丢失或只读模式下拒绝写入。
-- **多终端感知**：设置页「开放 IP / 协作」分区（监听范围、信任主机、写者诊断、修复统计、强制重置锁逃生舱）。
-- **多 IP 多端访问**：原生 dsh 不允许 `--host 0.0.0.0`，本插件把 webserver 默认
-  bind 改为 `0.0.0.0`（全部接口），tailnet / LAN / 本机所有 IP 同时可达同一个
-  后端；`/collab/settings` 配置页可切换监听范围并补充信任主机（热重载重绑）。
+- **防损坏**：多个 dsh 进程并发追加写同一个会话日志 → seq 分叉损坏。本插件用
+  **单写者锁**从根上禁止并发写：第一个后端成为写者，其余后端**自动降级为只读
+  跟随者**（不崩、不抢锁、不写）；`mode: writer` 下第二实例快速失败。
+- **自修复**：启动时自动扫描全部会话日志，对损坏文件执行「选最长连续分支 →
+  重建合法两帧 Zstd → 原子替换 + 原件备份 `.corrupt.bak`」。
+- **写路径兜底**：每次落盘前校验锁身份；锁异常时**告警并跳过落盘**（回合不失败、
+  文件不损坏）。
+- **多终端感知**：设置页「开放 IP / 协作」分区（监听范围、信任主机、写者诊断、
+  修复统计、强制重置锁逃生舱）。
+- **多 IP 多端访问**：原生 dsh 拒绝 `--host 0.0.0.0`，本插件让 webserver 支持
+  全部接口绑定（`DSH_WEB_BIND=0.0.0.0`），tailnet / LAN / 本机所有 IP 可达
+  同一个后端。
 
 > 说明：单后端下跨端**实时同步**本身由 dsh 自带的 mux 广播承担（每个浏览器都会
 > 收到全部 `session/event`）。本插件负责把它变成安全、可感知、可自愈的形态。
 
 ## 安装
 
-### 方式 A：官方装配（持久，需重启）
+前提：已按官方方式安装 DeepSeek Harness（`npm i -g @deepseek-ai/dsh`，`dsh`
+为官方 CLI）。本插件**不依赖任何自定义启动脚本**。
+
+### 方式 A：git clone + 官方装配（推荐，持久，需重启）
 
 ```bash
-# 在插件仓库目录执行（或用绝对路径）
-dsh plugin --profile web add /path/to/dsh-collab-sync
+git clone https://github.com/cxxy161/dsh-collab-sync.git
+dsh plugin --profile web add ./dsh-collab-sync
 # 重启 dsh web
 ```
 
@@ -75,7 +100,7 @@ dev_inject_plugin dir=/path/to/dsh-collab-sync
 | `mode: off` | 完全禁用 |
 | `lockStaleAfterMs` | 锁心跳陈旧阈值（跨机共享 sessions 目录时调大） |
 | `repairOnBoot` | 启动时全量扫描并修复损坏日志 |
-| `presence` | 开启 `/collab/*` 路由与 GUI beacon |
+| `presence` | 开启 `/collab/*` 路由与设置页协作分区 |
 
 ## 多 IP 多端访问（0.0.0.0 绑定）
 
@@ -89,7 +114,7 @@ dev_inject_plugin dir=/path/to/dsh-collab-sync
   这是开放多 IP 的**显式控制面**：选 0.0.0.0 后 tailnet / LAN / 本机 IP 全部
   可达同一个后端。
 - **指定 IP 绑定**：原生 host schema 只允许 127.0.0.1/0.0.0.0，需要先运行一次
-  `scripts/setup-bind.sh`（幂等）把校验放宽为 `z.string()`；配置页会在未放宽时
+  `scripts/setup-bind.sh`（幂等）把校验放宽为 `z.string()`；设置页会在未放宽时
   给出提示。绑定 0.0.0.0 时本机所有局域网 IP 自动进入 `trustedHosts`（dsh 自带
   的 LAN 推导），无需额外配置。
 - **多实例兼容（不崩、不损坏）**：若同 `DSH_HOME` 下起了多个 `dsh web`
@@ -118,8 +143,8 @@ dev_inject_plugin dir=/path/to/dsh-collab-sync
 
 | 现象 | 处理 |
 |---|---|
-| 第二个后端启动显示「降级为只读跟随者」 | 正常：自动降级，不写日志；写者身份见 `/collab/api/status`。被占用时发消息会得到中文提示（含写者 pid/端口）——请连写者实例，或只运行一个后端（0.0.0.0） |
-| 锁异常卡住解不开 | 设置页 `/collab/settings` 底部「强制重置写者锁」逃生舱（确认其他后端已停止后使用），无需再关插件 |
+| 第二个后端启动显示「降级为只读跟随者」 | 正常：自动降级，不写日志；写者身份见设置页「开放 IP / 协作」或 `/collab/api/status`。需要实时同步请改用单后端 0.0.0.0 |
+| 锁异常卡住解不开 | 设置页「开放 IP / 协作」底部「强制重置写者锁」逃生舱（确认其他后端已停止后使用），无需再关插件 |
 | 第二个后端（`mode: writer`）启动报「another dsh instance already owns session root」 | 严格单后端模式：停掉运行中的实例，或换 `DSH_HOME`，或改回 `mode: auto`/`readonly` |
 | 日志 `corrupt session log: seq gap in committed region` | 运行 `collab_repair` 或重启后端（启动扫描自动修复）；原件在 `.corrupt.bak` |
 | 设置页无「开放 IP / 协作」分区 | 需重启 dsh（客户端清单在启动时扫描装配） |
@@ -128,10 +153,13 @@ dev_inject_plugin dir=/path/to/dsh-collab-sync
 ## 开发
 
 ```bash
-node tests/run-all.js   # 单元回归（帧扫描/分叉修复/锁）
+node tests/run-all.js             # 单元回归（帧扫描/分叉修复/锁/绑定）
+node scripts/build-client.mjs     # 修改 src/client.js 后重建 lib/client.js（内联 react）
 ```
 
-纯 JS 实现，无构建步骤；依赖 `@deepseek-ai/dsh-tools`、`@deepseek-ai/dsh-session`
+宿主纯 JS；客户端（设置页卡片）由 `src/client.js` + `scripts/build-client.mjs`
+构建为 `lib/client.js`（内联 react，安装无需构建）。运行时依赖
+`@deepseek-ai/dsh-tools`、`@deepseek-ai/dsh-session`、`@deepseek-ai/dsh-host-webserver`
 与 Node 内置 `node:zlib`（zstd）。
 
 ## License
