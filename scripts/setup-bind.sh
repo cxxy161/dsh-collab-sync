@@ -9,6 +9,20 @@
 # 无需本脚本即可多 IP 访问；只有需要「指定 IP」绑定时才需要跑一次。
 set -euo pipefail
 
+resolve_pkg() {
+  local pkg
+  pkg="$(node -e "try{console.log(require.resolve('@deepseek-ai/$1/package.json',{paths:[process.cwd()]}))}catch(e){}" 2>/dev/null || true)"
+  if [ -n "$pkg" ]; then
+    echo "$(dirname "$pkg")/$2"
+    return
+  fi
+  if [ -n "${DSH_INSTALL:-}" ]; then
+    echo "$DSH_INSTALL/@deepseek-ai/$1/$2"
+    return
+  fi
+  echo ""
+}
+
 resolve_webserver() {
   local pkg
   pkg="$(node -e "try{console.log(require.resolve('@deepseek-ai/dsh-host-webserver/package.json',{paths:[process.cwd()]}))}catch(e){}" 2>/dev/null || true)"
@@ -56,8 +70,25 @@ if [ -n "$STARTUP" ] && [ -f "$STARTUP" ] && grep -q 'options.host === "0.0.0.0"
   patched=1
 fi
 
+# ── 远程(非回环)来源的浏览器也能读写设置页 ────────────────────────────────
+# 原客户端把非回环 origin 的设置作用域判为 memory/unavailable → 插件配置页空白。
+# 此段把三处客户端门禁改为 host（与 patch-dsh.sh 服务端 trustedHosts 放行一致）。
+UI_SETTINGS="$(resolve_pkg dsh-client-ui-settings lib/client.js)"
+UI_SETTINGS_GENERAL="$(resolve_pkg dsh-client-ui-settings-general lib/client.js)"
+UI_SETTINGS_MODELS="$(resolve_pkg dsh-client-ui-settings-models lib/client.js)"
+for f in "$UI_SETTINGS" "$UI_SETTINGS_MODELS"; do
+  if [ -n "$f" ] && [ -f "$f" ] && grep -q 'connection.isLoopback ? "host" : "memory"' "$f"; then
+    sed -i 's|connection\.isLoopback ? "host" : "memory"|"host" /* dsh-collab-sync: remote settings enabled */|' "$f"
+    patched=1
+  fi
+done
+if [ -n "$UI_SETTINGS_GENERAL" ] && [ -f "$UI_SETTINGS_GENERAL" ] && grep -q 'connection.isLoopback ? new SettingsDocumentStore(connection.api) : void 0' "$UI_SETTINGS_GENERAL"; then
+  sed -i 's|connection\.isLoopback ? new SettingsDocumentStore(connection\.api) : void 0|new SettingsDocumentStore(connection.api) /* dsh-collab-sync: remote settings enabled */|' "$UI_SETTINGS_GENERAL"
+  patched=1
+fi
+
 if [ "$patched" -eq 1 ]; then
-  echo "[dsh-collab-sync] host schema widened to z.string() — 重启 dsh 后支持任意 bind IP"
+  echo "[dsh-collab-sync] host schema widened + remote settings enabled — 重启 dsh 后生效"
 else
   echo "[dsh-collab-sync] already widened (no change)"
 fi

@@ -42,3 +42,13 @@
 
 ### Fixed
 - 写路径守卫在锁被替换/丢失时给出中文报错并自愈（按需重新取锁）。
+
+## [0.1.3] - 2026-08-15
+
+### Fixed
+- **远程(非回环)来源的设置页空白**：dsh 客户端把非回环 origin 的设置作用域
+  判为 `memory/unavailable`，导致「设置 → 插件 → 插件配置」在 LAN/tailnet IP
+  下空白。`scripts/setup-bind.sh` 现在会（幂等）把三处客户端门禁改为 `host`：
+  `dsh-client-ui-settings`（插件配置）、`dsh-client-ui-settings-general`
+  （打开配置文件）、`dsh-client-ui-settings-models`（模型欢迎条）。
+  服务端侧由 `patch-dsh.sh` 的 `trustedHosts` 放行已配套（须两者同时生效）。
