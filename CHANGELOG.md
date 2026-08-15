@@ -18,3 +18,14 @@
   `scripts/setup-bind.sh` 幂等放宽脚本。
 - Agent 工具：`collab_status`、`collab_repair`。
 - 测试套件（`tests/`，25 用例）与发布脚本（`scripts/release.sh`）。
+
+## [0.1.1] - 2026-08-15
+
+### Fixed
+- **写路径自愈**：`assertCanWrite` 在锁丢失（中断的热重载/外部清理）或降级
+  跟随者被实际使用时，按需自动重新取锁晋升为写者；仅在存在**存活写者**时才
+  拒绝写入（英文报错并附写者 pid/端口）。彻底消除「writer lock is not held」
+  导致的操作阻塞。
+- 全部报错/日志消息改为英文（面板/配置页 UI 保持中文）。
+- 协作面板与配置页互链、beacon 徽标、面板「打开主 GUI」均改为**当前标签页
+  覆盖**，不再新开标签页。

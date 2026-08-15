@@ -90,7 +90,7 @@ export async function testStolenTokenGuard() {
     join(dir, '.dsh-collab-writer.lock'),
     JSON.stringify({ token: 'other', pid: 1, hostname: 'other', startedAt: Date.now(), heartbeatAt: Date.now(), version: 1 }),
   )
-  throws(() => lock.assertCanWrite(), /replaced\/stolen/, 'write refused after lock stolen')
+  throws(() => lock.assertCanWrite(), /replaced or stolen/, 'write refused after lock stolen')
   // 释放时不应误删他人的锁
   lock.release()
   ok(existsSync(join(dir, '.dsh-collab-writer.lock')), 'other lock untouched')
@@ -109,7 +109,47 @@ export async function testDegradeToReadonlyOnConflict() {
   eq(second.status().mode, 'readonly', 'degraded to readonly')
   eq(second.status().degraded, true, 'degraded flag set')
   ok(!second.isWriter, 'not writer after degrade')
-  throws(() => second.assertCanWrite(), /read-only follower/, 'refuses write after degrade')
+  // 写者仍存活：降级实例尝试晋升 → 抛出英文冲突错误（不写、不损坏）
+  throws(() => second.assertCanWrite(), /writer lock is held by pid/, 'live conflict throws English error')
+  first.release()
+  rmSync(dir, { recursive: true, force: true })
+}
+
+export async function testSelfHealReacquireOnWrite() {
+  const dir = makeTempDir()
+  const lock = makeLock(dir)
+  ok(lock.acquire().ok, 'acquired')
+  lock.release() // 模拟锁丢失（中断的重载/外部清理）
+  ok(!lock.isWriter, 'lock released')
+  lock.assertCanWrite() // 自愈：按需重新取锁，不抛错
+  ok(lock.isWriter, 're-acquired on demand')
+  lock.release()
+  rmSync(dir, { recursive: true, force: true })
+}
+
+export async function testDegradedFollowerSelfPromotesOnWrite() {
+  const dir = makeTempDir()
+  const first = makeLock(dir)
+  ok(first.acquire().ok, 'first acquires')
+  const second = makeLock(dir)
+  eq(second.acquire().ok, false, 'second conflict')
+  second.degrade()
+  first.release() // 写者退出，锁释放
+  second.assertCanWrite() // 被实际使用时按需晋升为写者
+  ok(second.isWriter, 'degraded follower promoted on demand')
+  eq(second.status().degraded, false, 'degraded flag cleared')
+  second.release()
+  rmSync(dir, { recursive: true, force: true })
+}
+
+export async function testLiveConflictStillThrowsEnglish() {
+  const dir = makeTempDir()
+  const first = makeLock(dir)
+  ok(first.acquire().ok, 'first acquires')
+  const second = makeLock(dir)
+  ok(!second.acquire().ok, 'second conflict')
+  second.degrade()
+  throws(() => second.assertCanWrite(), /writer lock is held by pid/, 'live conflict throws English error')
   first.release()
   rmSync(dir, { recursive: true, force: true })
 }
